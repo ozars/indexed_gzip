@@ -752,6 +752,9 @@ cdef class _IndexedGzipFile:
             filename,
             fileobj))
 
+    def get_index(self):
+        return _ZranIndex.create(&self.index)
+
 
 cdef class ReadBuffer:
     """Wrapper around a chunk of memory.
@@ -851,3 +854,69 @@ class SafeIndexedGzipFile(IndexedGzipFile):
                       'use IndexedGzipFile instead',
                       DeprecationWarning)
         super(SafeIndexedGzipFile, self).__init__(*args, **kwargs)
+
+cdef class _ZranIndex:
+    cdef zran.zran_index_t* ptr
+
+    @staticmethod
+    cdef create(zran.zran_index_t* ptr):
+        cdef _ZranIndex zi = _ZranIndex()
+        zi.ptr = ptr
+        return zi
+
+    @property
+    def compressed_size(self):
+        return self.ptr.compressed_size
+
+    @property
+    def uncompressed_size(self):
+        return self.ptr.uncompressed_size
+
+    @property
+    def spacing(self):
+        return self.ptr.spacing
+
+    @property
+    def window_size(self):
+        return self.ptr.window_size
+
+    @property
+    def npoints(self):
+        return self.ptr.npoints
+
+    def __getitem__(self, key):
+        if type(key) != int:
+            raise TypeError('Index key must be an integer.')
+        if key < 0 or key >= self.npoints:
+            raise IndexError('Index key is out of range.')
+        cdef _ZranPoint zp = _ZranIndex()
+        zp.ptr = &self.ptr.list[key]
+        return zp
+
+cdef class _ZranPoint:
+
+    cdef zran.zran_index_t* idx_ptr
+    cdef zran.zran_point_t* ptr
+
+    @staticmethod
+    cdef create(zran.zran_index_t* idx_ptr, zran.zran_point_t* ptr):
+        cdef _ZranPoint zp = _ZranPoint()
+        zp.ptr     = ptr
+        zp.idx_ptr = idx_ptr
+        return zp
+
+    @property
+    def cmp_offset(self):
+        return self.ptr.cmp_offset
+
+    @property
+    def uncmp_offset(self):
+        return self.ptr.uncmp_offset
+
+    @property
+    def bits(self):
+        return self.ptr.bits
+
+    # TODO: Access to data
+
+
